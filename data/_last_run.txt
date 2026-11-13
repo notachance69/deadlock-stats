@@ -1,0 +1,40 @@
+Run 2026-11-13T17:43:58.776040+00:00
+
+OK  top NAmerica -n 30 --outdir data/top
+#  4 stevie b (1856249512) → data/top/1856249512.json
+#  5 Mujet (103277184) → data/top/103277184.json
+#  7 miami chud 3 | SoulLock.GG (733329479) → data/top/733329479.json
+#  8 Yinliner (72568913) → data/top/72568913.json
+#  9 TOE SNIFFER (1046813674) → data/top/1046813674.json
+# 10 Immajeanyus (846183775) → data/top/846183775.json
+# 12 Shadovis (1742834852) → data/top/1742834852.json
+# 13 RYUSENKEI (1723923657) → data/top/1723923657.json
+# 14 Tim_sab (145596499) → data/top/145596499.json
+# 15 Nompty (YOU'LL ALL DIE!!!!) (1204071049) → data/top/1204071049.json
+# 16 MAZER6055 (1007124347) → data/top/1007124347.json
+# 18 TinoMochacinno (1879933144) → data/top/1879933144.json
+# 21 Jiggah (838936181) → data/top/838936181.json
+# 22 C9 Puppy Girl (669186459) → data/top/669186459.json
+# 23 crime consultant (452824007) → data/top/452824007.json
+# 25 Sheynen (1069816659) → data/top/1069816659.json
+# 29 pandaego live (7910302) → data/top/7910302.json
+# 33 Remushin (466053897) → data/top/466053897.json
+# 34 Bleghhhh (1162986904) → data/top/1162986904.json
+# 35 Kintsuu (1739333567) → data/top/1739333567.json
+# 37 TheBenadrylBoofer (212789311) → data/top/212789311.json
+# 39 Doctor Penis. (764989254) → data/top/764989254.json
+# 41 benij (194324365) → data/top/194324365.json
+# 45 GRANDxPAPPY (1069632725) → data/top/1069632725.json
+# 46 vanilla ୨ৎ (1260631191) → data/top/1260631191.json
+# 47 woneumchu (1036512811) → data/top/1036512811.json
+# 48 limit testing my sanity (186722553) → data/top/186722553.json
+# 50 sharkaduck (1116557036) → data/top/1116557036.json
+# 51 ttv/prollyDragon (1082467242) → data/top/1082467242.json
+# 52 YungnHung06 (1053134511) → data/top/1053134511.json
+Saved 30 players (skipped 22 with ambiguous IDs). Index: data/top/_index_NAmerica_all.json
+
+OK  fetch history 122627581 -o data/history/122627581.json
+Saved data/history/122627581.json from https://api.deadlock-api.com/v1/players/122627581/match-history
+
+OK  fetch hero-stats 100 -o data/analytics/hero_stats_badge100.json
+Saved data/analytics/hero_stats_badge100.json from https://api.deadlock-api.com/v1/analytics/hero-stats?min_average_badge=100

@@ -1,0 +1,302 @@
+{
+ "source": "https://api.deadlock-api.com/v1/leaderboard/NAmerica",
+ "fetched": "2026-11-13T17:44:55.395200+00:00",
+ "skipped_ambiguous": 22,
+ "players": [
+  {
+   "position": 4,
+   "name": "stevie b",
+   "rank": 4,
+   "account_id": 1856249512,
+   "top_heroes": [],
+   "file": "data/top/1856249512.json"
+  },
+  {
+   "position": 5,
+   "name": "Mujet",
+   "rank": 5,
+   "account_id": 103277184,
+   "top_heroes": [
+    "Pocket"
+   ],
+   "file": "data/top/103277184.json"
+  },
+  {
+   "position": 7,
+   "name": "miami chud 3 | SoulLock.GG",
+   "rank": 7,
+   "account_id": 733329479,
+   "top_heroes": [],
+   "file": "data/top/733329479.json"
+  },
+  {
+   "position": 8,
+   "name": "Yinliner",
+   "rank": 8,
+   "account_id": 72568913,
+   "top_heroes": [
+    "Dynamo",
+    "Kelvin"
+   ],
+   "file": "data/top/72568913.json"
+  },
+  {
+   "position": 9,
+   "name": "TOE SNIFFER",
+   "rank": 9,
+   "account_id": 1046813674,
+   "top_heroes": [
+    "Abrams",
+    "Drifter"
+   ],
+   "file": "data/top/1046813674.json"
+  },
+  {
+   "position": 10,
+   "name": "Immajeanyus",
+   "rank": 10,
+   "account_id": 846183775,
+   "top_heroes": [
+    "Paradox",
+    "Holliday"
+   ],
+   "file": "data/top/846183775.json"
+  },
+  {
+   "position": 12,
+   "name": "Shadovis",
+   "rank": 12,
+   "account_id": 1742834852,
+   "top_heroes": [
+    "Yamato"
+   ],
+   "file": "data/top/1742834852.json"
+  },
+  {
+   "position": 13,
+   "name": "RYUSENKEI",
+   "rank": 13,
+   "account_id": 1723923657,
+   "top_heroes": [],
+   "file": "data/top/1723923657.json"
+  },
+  {
+   "position": 14,
+   "name": "Tim_sab",
+   "rank": 14,
+   "account_id": 145596499,
+   "top_heroes": [
+    "Shiv"
+   ],
+   "file": "data/top/145596499.json"
+  },
+  {
+   "position": 15,
+   "name": "Nompty (YOU'LL ALL DIE!!!!)",
+   "rank": 15,
+   "account_id": 1204071049,
+   "top_heroes": [],
+   "file": "data/top/1204071049.json"
+  },
+  {
+   "position": 16,
+   "name": "MAZER6055",
+   "rank": 16,
+   "account_id": 1007124347,
+   "top_heroes": [
+    "Ivy"
+   ],
+   "file": "data/top/1007124347.json"
+  },
+  {
+   "position": 18,
+   "name": "TinoMochacinno",
+   "rank": 18,
+   "account_id": 1879933144,
+   "top_heroes": [
+    "Mo & Krill"
+   ],
+   "file": "data/top/1879933144.json"
+  },
+  {
+   "position": 21,
+   "name": "Jiggah",
+   "rank": 21,
+   "account_id": 838936181,
+   "top_heroes": [
+    "Vyper"
+   ],
+   "file": "data/top/838936181.json"
+  },
+  {
+   "position": 22,
+   "name": "C9 Puppy Girl",
+   "rank": 22,
+   "account_id": 669186459,
+   "top_heroes": [
+    "Celeste"
+   ],
+   "file": "data/top/669186459.json"
+  },
+  {
+   "position": 23,
+   "name": "crime consultant",
+   "rank": 23,
+   "account_id": 452824007,
+   "top_heroes": [
+    "Vindicta"
+   ],
+   "file": "data/top/452824007.json"
+  },
+  {
+   "position": 25,
+   "name": "Sheynen",
+   "rank": 25,
+   "account_id": 1069816659,
+   "top_heroes": [
+    "Vyper",
+    "Wraith"
+   ],
+   "file": "data/top/1069816659.json"
+  },
+  {
+   "position": 29,
+   "name": "pandaego live",
+   "rank": 29,
+   "account_id": 7910302,
+   "top_heroes": [
+    "Rem"
+   ],
+   "file": "data/top/7910302.json"
+  },
+  {
+   "position": 33,
+   "name": "Remushin",
+   "rank": 33,
+   "account_id": 466053897,
+   "top_heroes": [],
+   "file": "data/top/466053897.json"
+  },
+  {
+   "position": 34,
+   "name": "Bleghhhh",
+   "rank": 34,
+   "account_id": 1162986904,
+   "top_heroes": [
+    "Graves"
+   ],
+   "file": "data/top/1162986904.json"
+  },
+  {
+   "position": 35,
+   "name": "Kintsuu",
+   "rank": 35,
+   "account_id": 1739333567,
+   "top_heroes": [
+    "Lash"
+   ],
+   "file": "data/top/1739333567.json"
+  },
+  {
+   "position": 37,
+   "name": "TheBenadrylBoofer",
+   "rank": 37,
+   "account_id": 212789311,
+   "top_heroes": [
+    "Seven",
+    "Victor"
+   ],
+   "file": "data/top/212789311.json"
+  },
+  {
+   "position": 39,
+   "name": "Doctor Penis.",
+   "rank": 39,
+   "account_id": 764989254,
+   "top_heroes": [
+    "Wraith"
+   ],
+   "file": "data/top/764989254.json"
+  },
+  {
+   "position": 41,
+   "name": "benij",
+   "rank": 41,
+   "account_id": 194324365,
+   "top_heroes": [
+    "Wraith"
+   ],
+   "file": "data/top/194324365.json"
+  },
+  {
+   "position": 45,
+   "name": "GRANDxPAPPY",
+   "rank": 45,
+   "account_id": 1069632725,
+   "top_heroes": [
+    "Mina"
+   ],
+   "file": "data/top/1069632725.json"
+  },
+  {
+   "position": 46,
+   "name": "vanilla \u0b68\u09ce",
+   "rank": 46,
+   "account_id": 1260631191,
+   "top_heroes": [
+    "Paige"
+   ],
+   "file": "data/top/1260631191.json"
+  },
+  {
+   "position": 47,
+   "name": "woneumchu",
+   "rank": 47,
+   "account_id": 1036512811,
+   "top_heroes": [
+    "Dynamo"
+   ],
+   "file": "data/top/1036512811.json"
+  },
+  {
+   "position": 48,
+   "name": "limit testing my sanity",
+   "rank": 48,
+   "account_id": 186722553,
+   "top_heroes": [
+    "Holliday",
+    "Wraith"
+   ],
+   "file": "data/top/186722553.json"
+  },
+  {
+   "position": 50,
+   "name": "sharkaduck",
+   "rank": 50,
+   "account_id": 1116557036,
+   "top_heroes": [
+    "Infernus"
+   ],
+   "file": "data/top/1116557036.json"
+  },
+  {
+   "position": 51,
+   "name": "ttv/prollyDragon",
+   "rank": 51,
+   "account_id": 1082467242,
+   "top_heroes": [
+    "Mina",
+    "Celeste"
+   ],
+   "file": "data/top/1082467242.json"
+  },
+  {
+   "position": 52,
+   "name": "YungnHung06",
+   "rank": 52,
+   "account_id": 1053134511,
+   "top_heroes": [],
+   "file": "data/top/1053134511.json"
+  }
+ ]
+}
