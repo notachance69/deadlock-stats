@@ -1,0 +1,83 @@
+name: Fetch Deadlock data
+
+# Run from the GitHub app or website: Actions → "Fetch Deadlock data" → Run workflow.
+# Saves raw API JSON into data/ so it can be analyzed later (by deadlock_tool.py or Claude).
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "What to fetch"
+        type: choice
+        options: [history, match, leaderboard]
+        default: history
+      id:
+        description: "history: account ID or tracklock URL · match: match ID(s), comma-separated · leaderboard: region (NAmerica, Europe, Asia, SAmerica, Oceania)"
+        required: true
+        default: "122627581"
+      hero:
+        description: "leaderboard only: hero name or ID (e.g. Haze)"
+        required: false
+        default: "Haze"
+      recent_timelines:
+        description: "history only: also fetch per-match timelines for the N most recent ranked matches (0 = none)"
+        required: false
+        default: "0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-data
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch
+        env:
+          KIND: ${{ inputs.kind }}
+          ID: ${{ inputs.id }}
+          HERO: ${{ inputs.hero }}
+          RECENT: ${{ inputs.recent_timelines }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/history data/matches data/leaderboards
+          case "$KIND" in
+            history)
+              ACCT=$(python3 -c "import sys; sys.path.insert(0,'.'); import deadlock_tool as t; print(t.acct(sys.argv[1]))" "$ID")
+              python3 deadlock_tool.py fetch history "$ACCT" -o "data/history/$ACCT.json"
+              if [ "${RECENT:-0}" -gt 0 ]; then
+                for M in $(python3 deadlock_tool.py ids "data/history/$ACCT.json" --ranked -n "$RECENT" | cut -d' ' -f1); do
+                  python3 deadlock_tool.py fetch match "$M" -o "data/matches/$M.json" || echo "::warning::timeline for $M not available"
+                  sleep 2
+                done
+              fi
+              ;;
+            match)
+              for M in $(echo "$ID" | tr ',' ' '); do
+                python3 deadlock_tool.py fetch match "$M" -o "data/matches/$M.json"
+                sleep 2
+              done
+              ;;
+            leaderboard)
+              HID=$(python3 -c "import sys; sys.path.insert(0,'.'); import deadlock_tool as t; print(t.hero_id(sys.argv[1]))" "$HERO")
+              python3 deadlock_tool.py fetch leaderboard "$ID" "$HID" -o "data/leaderboards/${ID}_${HID}.json"
+              ;;
+          esac
+
+      - name: Commit data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then echo "No new data"; exit 0; fi
+          git commit -m "data: ${{ inputs.kind }} ${{ inputs.id }}"
+          git push

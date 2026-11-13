@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deadlock Stats Exporter</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --line:#2a2f3a; --fg:#e8e6e1; --mute:#9aa0aa; --acc:#d9a441; --win:#4fb477; --loss:#d9534f; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:1100px; margin:0 auto; padding:20px 16px 60px; }
+  h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:15px; margin:24px 0 8px; color:var(--acc); }
+  .sub { color:var(--mute); margin:0 0 16px; }
+  form { display:flex; gap:8px; flex-wrap:wrap; }
+  input { flex:1; min-width:200px; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); font-size:15px; }
+  button { padding:10px 14px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; font-size:14px; }
+  button.primary { background:var(--acc); color:#111; border-color:var(--acc); font-weight:600; }
+  button:disabled { opacity:.5; cursor:default; }
+  #status { margin:12px 0; color:var(--mute); min-height:20px; }
+  #status.err { color:var(--loss); }
+  .profile { display:flex; gap:12px; align-items:center; margin-top:8px; }
+  .profile img { width:56px; height:56px; border-radius:8px; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; margin-top:12px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px; }
+  .tile b { display:block; font-size:20px; } .tile span { color:var(--mute); font-size:12px; }
+  .exports { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .scroll { overflow-x:auto; border:1px solid var(--line); border-radius:8px; }
+  table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; }
+  th, td { padding:6px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  th { position:sticky; top:0; background:var(--card); color:var(--mute); font-weight:600; cursor:pointer; }
+  th:first-child, td:first-child, th.l, td.l { text-align:left; }
+  .W { color:var(--win); font-weight:600; } .L { color:var(--loss); font-weight:600; }
+  .hidden { display:none; }
+  .help { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:4px 14px 14px; margin-bottom:12px; }
+  .help code { color:var(--acc); }
+  .insights { margin:0; padding-left:18px; } .insights li { margin:6px 0; } .insights b { color:var(--acc); }
+  textarea { width:100%; margin:4px 0 8px; padding:8px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--fg); font:12px ui-monospace,monospace; }
+  footer { color:var(--mute); font-size:12px; margin-top:24px; }
+  a { color:var(--acc); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Deadlock Stats Exporter</h1>
+  <p class="sub">Pulls a player's match history from the free public Deadlock API and lets you export it as CSV or JSON.</p>
+
+  <form id="f">
+    <input id="acct" value="122627581" placeholder="Account ID (e.g. 122627581) or SteamID64" inputmode="numeric" autocomplete="off">
+    <button class="primary" id="go" type="submit">Load stats</button>
+  </form>
+  <div id="status"></div>
+  <div id="help" class="hidden help">
+    <p><b>Check 1:</b> open <a id="rawLink" target="_blank" rel="noopener" href="#">the raw API data for this account</a>. If you see a page of text starting with <code>[{"account_id"</code>, the API is fine and the problem is how this file was opened. On iPhone, the Files app preview blocks internet requests, so open the file on a computer, or use Check 2.</p>
+    <p><b>Check 2 (works anywhere):</b> on that raw API page, select all, copy, paste it below and tap <i>Use pasted data</i>.</p>
+    <textarea id="paste" rows="4" placeholder='Paste the JSON here: [{"account_id":…}]'></textarea>
+    <button id="usePaste" type="button">Use pasted data</button>
+  </div>
+
+  <section id="out" class="hidden">
+    <div class="profile" id="profile"></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="exports">
+      <button id="csvMatches">Download matches CSV</button>
+      <button id="csvHeroes">Download hero summary CSV</button>
+      <button id="json">Download raw JSON</button>
+      <button id="copy">Copy matches CSV</button>
+      <button id="copySummary" class="primary">Copy summary for Claude</button>
+    </div>
+
+    <h2>Play style &amp; what to work on</h2>
+    <ul id="insights" class="insights"></ul>
+
+    <h2>By hero</h2>
+    <div class="scroll"><table id="heroTable"></table></div>
+
+    <h2>Match history</h2>
+    <div class="scroll" style="max-height:560px"><table id="matchTable"></table></div>
+  </section>
+
+  <footer>Data: <a href="https://deadlock-api.com" target="_blank" rel="noopener">deadlock-api.com</a> (unofficial, not affiliated with Valve). If the account's history looks short, the API may only have the matches it has collected so far.</footer>
+</main>
+
+<script>
+const API = "https://api.deadlock-api.com";
+const $ = id => document.getElementById(id);
+const HERO_NAMES = {"1": "Infernus", "2": "Seven", "3": "Vindicta", "4": "Lady Geist", "6": "Abrams", "7": "Wraith", "8": "McGinnis", "10": "Paradox", "11": "Dynamo", "12": "Kelvin", "13": "Haze", "14": "Holliday", "15": "Bebop", "16": "Calico", "17": "Grey Talon", "18": "Mo & Krill", "19": "Shiv", "20": "Ivy", "21": "Kali", "25": "Warden", "27": "Yamato", "31": "Lash", "35": "Viscous", "38": "Gunslinger", "39": "The Boss", "47": "Tokamak", "48": "Wrecker", "49": "Rutger", "50": "Pocket", "51": "Thumper", "52": "Mirage", "53": "Fathom", "54": "Cadence", "58": "Vyper", "59": "Vandal", "60": "Sinclair", "61": "Trapper", "62": "Raven", "63": "Mina", "64": "Drifter", "65": "Venator", "66": "Victor", "67": "Paige", "69": "The Doorman", "72": "Billy", "73": "Druid", "74": "Graf", "75": "Fortuna", "76": "Graves", "77": "Apollo", "78": "Airheart", "79": "Rem", "80": "Silver", "81": "Celeste", "82": "Opera"};
+const MODES = {1:"Unranked",2:"Private",3:"Bots",4:"Ranked",5:"Test"};
+const STEAM64_BASE = 76561197960265728n;
+let state = null;
+
+function toAccountId(raw) {
+  const s = raw.trim().replace(/.*\/(players|profiles)\//, "").replace(/\D.*$/, "");
+  if (!s) return null;
+  const n = BigInt(s);
+  return n > STEAM64_BASE ? Number(n - STEAM64_BASE) : Number(n);
+}
+function status(msg, err) { $("status").textContent = msg; $("status").className = err ? "err" : ""; }
+async function getJSON(url, { timeoutMs = 45000, retries = 1 } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    // No AbortSignal / fetch options: some in-app previewers relay fetch through
+    // postMessage and can't clone a signal ("The object can not be cloned").
+    let t;
+    const timeout = new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error("timeout"), { name: "AbortError" })), timeoutMs); });
+    try {
+      const r = await Promise.race([fetch(url), timeout]);
+      if (r.status === 429 && attempt < retries) { await sleep(3000); continue; }
+      if (!r.ok) {
+        let detail = ""; try { detail = (await r.text()).slice(0, 200); } catch {}
+        throw new ApiError(`API returned ${r.status}${detail ? ": " + detail : ""}`, "http");
+      }
+      return await Promise.race([r.json(), timeout]);
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      if (attempt < retries) { await sleep(1500); continue; }
+      if (err.name === "AbortError") throw new ApiError("the API took too long to answer (timed out)", "timeout");
+      throw new ApiError(`the browser couldn't reach the API (${err.message})`, "network");
+    } finally { clearTimeout(t); }
+  }
+}
+class ApiError extends Error { constructor(msg, kind) { super(msg); this.kind = kind; } }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const fmtDur = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+const fmtDate = t => new Date(t*1000).toLocaleString([], {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+const pct = (a,b) => b ? (100*a/b).toFixed(1)+"%" : "–";
+const kda = (k,d,a) => ((k+a)/Math.max(1,d)).toFixed(2);
+
+function isWin(m) {
+  if (m.player_match_outcome === 1) return true;
+  if (m.player_match_outcome === 2) return false;
+  return m.match_result === m.player_team;
+}
+
+async function load(e) {
+  e && e.preventDefault();
+  const id = toAccountId($("acct").value);
+  if (id == null) return status("Enter an account ID.", true);
+  $("go").disabled = true; $("out").classList.add("hidden"); $("help").classList.add("hidden");
+  $("rawLink").href = `${API}/v1/players/${id}/match-history`;
+  status("Loading match history… (can take up to ~30 s the first time)");
+  try {
+    const [matches, heroes, steam] = await Promise.all([
+      getJSON(`${API}/v1/players/${id}/match-history`),
+      getJSON(`${API}/v1/assets/heroes`).catch(() => []),
+      getJSON(`${API}/v1/players/${id}/steam`).catch(() => null),
+    ]);
+    await build(id, matches, heroes, steam);
+  } catch (err) {
+    console.error(err);
+    status(`Couldn't load data: ${err.message}.`, true);
+    $("help").classList.remove("hidden");
+  } finally { $("go").disabled = false; }
+}
+
+async function usePaste() {
+  const id = toAccountId($("acct").value);
+  let data;
+  try { data = JSON.parse($("paste").value.trim()); }
+  catch { return status("That doesn't look like the full JSON — make sure you copied everything from [ to ].", true); }
+  const matches = Array.isArray(data) ? data : data.matches;
+  if (!Array.isArray(matches)) return status("Pasted JSON isn't a match list.", true);
+  status("Using pasted data…");
+  const heroes = await getJSON(`${API}/v1/assets/heroes`, { timeoutMs: 8000, retries: 0 }).catch(() => []);
+  await build(matches[0]?.account_id ?? id, matches, heroes, null);
+}
+
+async function build(id, matches, heroes, steam) {
+  if (!Array.isArray(matches)) throw new ApiError("unexpected response from the API", "shape");
+  if (!matches.length) {
+    status(`The API has no stored matches for account ${id}. Check the ID (it's the number in the Tracklock URL), or the API may not have collected this player's matches yet.`, true);
+    return;
+  }
+  {
+    const heroName = { ...HERO_NAMES };
+    (Array.isArray(heroes) ? heroes : []).forEach(h => heroName[h.id] = h.name || `Hero ${h.id}`);
+    const rows = matches.map(m => ({
+      match_id: m.match_id,
+      date: fmtDate(m.start_time),
+      start_time_unix: m.start_time,
+      mode: MODES[m.match_mode] || m.match_mode,
+      hero: heroName[m.hero_id] || `Hero ${m.hero_id}`,
+      hero_id: m.hero_id,
+      result: isWin(m) ? "W" : "L",
+      kills: m.player_kills, deaths: m.player_deaths, assists: m.player_assists,
+      kda: kda(m.player_kills, m.player_deaths, m.player_assists),
+      net_worth: m.net_worth, last_hits: m.last_hits, denies: m.denies,
+      hero_level: m.hero_level,
+      duration: fmtDur(m.match_duration_s), duration_s: m.match_duration_s,
+      souls_per_min: (m.net_worth / Math.max(1, m.match_duration_s/60)).toFixed(0),
+      ranked_badge: m.ranked_display_badge ?? "",
+      ranked_delta: m.ranked_delta ?? "",
+      abandoned: m.abandoned_time_s ? "yes" : "",
+    }));
+    state = { id, raw: { account_id:id, steam, matches }, rows, heroes: summarizeHeroes(rows) };
+    render(steam);
+    $("help").classList.add("hidden");
+    status(`Loaded ${rows.length} matches.`);
+  }
+}
+
+function summarizeHeroes(rows) {
+  const by = {};
+  rows.forEach(r => {
+    const h = by[r.hero] ||= { hero:r.hero, games:0, wins:0, k:0, d:0, a:0, nw:0, mins:0 };
+    h.games++; if (r.result === "W") h.wins++;
+    h.k += r.kills; h.d += r.deaths; h.a += r.assists; h.nw += r.net_worth; h.mins += r.duration_s/60;
+  });
+  return Object.values(by).sort((a,b) => b.games - a.games).map(h => ({
+    hero:h.hero, games:h.games, wins:h.wins, losses:h.games-h.wins, win_rate:pct(h.wins,h.games),
+    avg_kills:(h.k/h.games).toFixed(1), avg_deaths:(h.d/h.games).toFixed(1), avg_assists:(h.a/h.games).toFixed(1),
+    kda:kda(h.k,h.d,h.a), avg_net_worth:Math.round(h.nw/h.games), souls_per_min:(h.nw/Math.max(1,h.mins)).toFixed(0),
+  }));
+}
+
+function render(steam) {
+  const r = state.rows, n = r.length, w = r.filter(x => x.result === "W").length;
+  const tk = r.reduce((s,x)=>s+x.kills,0), td = r.reduce((s,x)=>s+x.deaths,0), ta = r.reduce((s,x)=>s+x.assists,0);
+  const last20 = r.slice(0,20), w20 = last20.filter(x=>x.result==="W").length;
+  $("profile").innerHTML = steam
+    ? `<img src="${steam.avatarmedium}" alt=""><div><b>${esc(steam.personaname)}</b><br><span class="sub">Account ${state.id}${steam.countrycode ? " · "+esc(steam.countrycode) : ""}</span></div>`
+    : `<div><b>Account ${state.id}</b></div>`;
+  const tiles = [
+    ["Matches", n], ["Win rate", pct(w,n)], ["Record", `${w}-${n-w}`], ["KDA", kda(tk,td,ta)],
+    ["Last 20 WR", pct(w20,last20.length)], ["Heroes played", state.heroes.length],
+    ["Avg souls/min", n ? (r.reduce((s,x)=>s+ +x.souls_per_min,0)/n).toFixed(0) : "–"],
+  ];
+  $("tiles").innerHTML = tiles.map(([k,v]) => `<div class="tile"><b>${v}</b><span>${k}</span></div>`).join("");
+  state.insights = insights(r, state.heroes);
+  $("insights").innerHTML = state.insights.map(t => `<li>${t}</li>`).join("");
+  table($("heroTable"), state.heroes, ["hero"]);
+  table($("matchTable"), r.map(({start_time_unix, hero_id, duration_s, ...x}) => x), ["date","mode","hero"]);
+  $("out").classList.remove("hidden");
+}
+
+// ---------- Play-style analysis ----------
+function grp(rows, pred) {
+  const g = rows.filter(pred), w = g.filter(x => x.result === "W").length;
+  return { n: g.length, w, wr: g.length ? w / g.length : NaN };
+}
+const avg = (rows, f) => rows.length ? rows.reduce((s, x) => s + f(x), 0) / rows.length : NaN;
+const P = x => isNaN(x) ? "–" : (100 * x).toFixed(0) + "%";
+
+function insights(r, heroes) {
+  const out = [], n = r.length;
+  if (n < 5) return ["Not enough matches for a meaningful read (need at least 5)."];
+  const all = grp(r, () => true);
+  const W = r.filter(x => x.result === "W"), L = r.filter(x => x.result === "L");
+  const per10 = (x, k) => x[k] / Math.max(1, x.duration_s / 600);
+
+  // Style: fragger vs. team/support, aggression via deaths
+  const k = avg(r, x => x.kills), d = avg(r, x => x.deaths), a = avg(r, x => x.assists);
+  const style = a > k * 1.6 ? "a <b>team-fight / utility</b> player (assists well above kills)"
+              : k > a * 0.9 ? "a <b>frag-focused</b> player (kills close to or above assists)"
+              : "a <b>balanced</b> player (assists a bit above kills, typical for most roles)";
+  const aggro = d >= 7.5 ? "very aggressive, high-risk" : d >= 5.5 ? "fairly aggressive" : "careful, low-death";
+  out.push(`Style: you play as ${style}, averaging ${k.toFixed(1)} / ${d.toFixed(1)} / ${a.toFixed(1)}. Death rate reads as <b>${aggro}</b>.`);
+
+  // Hero pool
+  const top3 = heroes.slice(0, 3).reduce((s, h) => s + h.games, 0) / n;
+  out.push(top3 >= 0.7
+    ? `Hero pool: <b>focused</b>. ${P(top3)} of games are on your top 3 (${heroes.slice(0,3).map(h=>h.hero).join(", ")}).`
+    : `Hero pool: <b>wide</b>. Your top 3 heroes are only ${P(top3)} of games across ${heroes.length} heroes. Narrowing it usually climbs faster.`);
+  const q = heroes.filter(h => h.games >= 5).map(h => ({ ...h, wrn: h.wins / h.games }));
+  if (q.length >= 2) {
+    const best = [...q].sort((a, b) => b.wrn - a.wrn)[0], worst = [...q].sort((a, b) => a.wrn - b.wrn)[0];
+    out.push(`Best hero (5+ games): <b>${best.hero}</b> at ${P(best.wrn)} over ${best.games}. Weakest: <b>${worst.hero}</b> at ${P(worst.wrn)} over ${worst.games}${worst.wrn < 0.45 ? ". Consider benching it in ranked" : ""}.`);
+  }
+
+  // Deaths → outcome
+  const dW = avg(W, x => x.deaths), dL = avg(L, x => x.deaths);
+  const hi = grp(r, x => x.deaths >= 8), lo = grp(r, x => x.deaths <= 4);
+  if (hi.n >= 3 && lo.n >= 3)
+    out.push(`Deaths: you average ${dW.toFixed(1)} in wins vs <b>${dL.toFixed(1)} in losses</b>. Games with 4 or fewer deaths: ${P(lo.wr)} WR (${lo.n}). Games with 8+: <b>${P(hi.wr)}</b> (${hi.n}).${hi.wr < lo.wr - 0.15 ? " Dying less is your biggest lever." : ""}`);
+
+  // Farm
+  const sW = avg(W, x => +x.souls_per_min), sL = avg(L, x => +x.souls_per_min);
+  const lhW = avg(W, x => per10(x, "last_hits")), lhL = avg(L, x => per10(x, "last_hits"));
+  out.push(`Farm: ${sW.toFixed(0)} souls/min in wins vs ${sL.toFixed(0)} in losses. Last hits: ${lhW.toFixed(0)} vs ${lhL.toFixed(0)} per 10 min.${sL < sW * 0.9 ? " Losses come with a clear farm drop, so keep farming lanes and camps between fights." : ""}`);
+
+  // Game length
+  const sh = grp(r, x => x.duration_s < 25 * 60), md = grp(r, x => x.duration_s >= 25 * 60 && x.duration_s < 35 * 60), lg = grp(r, x => x.duration_s >= 35 * 60);
+  const parts = [[sh, "under 25 min"], [md, "25–35 min"], [lg, "35+ min"]].filter(([g]) => g.n >= 3).map(([g, l]) => `${l}: ${P(g.wr)} (${g.n})`);
+  if (parts.length >= 2) {
+    let tag = "";
+    if (lg.n >= 3 && sh.n >= 3) tag = lg.wr > sh.wr + 0.1 ? " You're stronger <b>late</b>: play safe early and scale." : sh.wr > lg.wr + 0.1 ? " You're stronger <b>early</b>: push your lead and close games out before they drag." : "";
+    out.push(`Game length WR: ${parts.join(", ")}.${tag}`);
+  }
+
+  // Ranked vs unranked, recent form
+  const rk = grp(r, x => x.mode === "Ranked"), ur = grp(r, x => x.mode === "Unranked");
+  if (rk.n >= 5 && ur.n >= 5) out.push(`Ranked ${P(rk.wr)} (${rk.n}) vs unranked ${P(ur.wr)} (${ur.n}).`);
+  const l20 = grp(r.slice(0, 20), () => true);
+  out.push(`Recent form: last ${l20.n} games ${P(l20.wr)} vs ${P(all.wr)} overall. ${l20.wr > all.wr + 0.08 ? "Trending up." : l20.wr < all.wr - 0.08 ? "Trending down. Might be a tilt or patch effect worth checking." : "Steady."}`);
+  return out;
+}
+
+function summaryText() {
+  const r = state.rows, n = r.length, w = r.filter(x => x.result === "W").length;
+  const lines = [`Deadlock account ${state.id}: ${n} matches, ${w}-${n - w} (${pct(w, n)})`, "", "Insights:",
+    ...state.insights.map(t => "- " + t.replace(/<[^>]+>/g, "")), "", "Heroes (games, WR, K/D/A, KDA, souls/min):",
+    ...state.heroes.map(h => `${h.hero}: ${h.games}g ${h.win_rate} ${h.avg_kills}/${h.avg_deaths}/${h.avg_assists} KDA ${h.kda} ${h.souls_per_min}spm`),
+    "", "Last 30 matches (date, mode, hero, result, K/D/A, souls/min, duration):",
+    ...r.slice(0, 30).map(x => `${x.date} ${x.mode} ${x.hero} ${x.result} ${x.kills}/${x.deaths}/${x.assists} ${x.souls_per_min}spm ${x.duration}`)];
+  return lines.join("\n");
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function table(el, data, leftCols) {
+  if (!data.length) { el.innerHTML = "<tr><td>No data</td></tr>"; return; }
+  const cols = Object.keys(data[0]);
+  let sortKey = null, asc = true;
+  const draw = () => {
+    const rows = sortKey ? [...data].sort((a,b) => {
+      const x = parseFloat(a[sortKey]), y = parseFloat(b[sortKey]);
+      const c = (!isNaN(x) && !isNaN(y)) ? x - y : String(a[sortKey]).localeCompare(String(b[sortKey]));
+      return asc ? c : -c; }) : data;
+    el.innerHTML = `<thead><tr>${cols.map(c => `<th class="${leftCols.includes(c)?"l":""}" data-k="${c}">${c.replace(/_/g," ")}</th>`).join("")}</tr></thead><tbody>` +
+      rows.map(r => `<tr>${cols.map(c => `<td class="${leftCols.includes(c)?"l ":""}${c==="result"?r[c]:""}">${esc(r[c])}</td>`).join("")}</tr>`).join("") + "</tbody>";
+    el.querySelectorAll("th").forEach(th => th.onclick = () => { const k = th.dataset.k; asc = sortKey === k ? !asc : false; sortKey = k; draw(); });
+  };
+  draw();
+}
+
+function toCSV(rows) {
+  if (!rows.length) return "";
+  const cols = Object.keys(rows[0]);
+  const q = v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
+  return [cols.join(","), ...rows.map(r => cols.map(c => q(r[c])).join(","))].join("\n");
+}
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], {type}));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const stamp = () => new Date().toISOString().slice(0,10);
+$("csvMatches").onclick = () => download(`deadlock_${state.id}_matches_${stamp()}.csv`, toCSV(state.rows), "text/csv");
+$("csvHeroes").onclick = () => download(`deadlock_${state.id}_heroes_${stamp()}.csv`, toCSV(state.heroes), "text/csv");
+$("json").onclick = () => download(`deadlock_${state.id}_raw_${stamp()}.json`, JSON.stringify(state.raw, null, 2), "application/json");
+$("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(toCSV(state.rows)); status("Matches CSV copied to clipboard."); }
+  catch { status("Clipboard blocked by the browser — use the download button instead.", true); }
+};
+$("copySummary").onclick = async () => {
+  try { await navigator.clipboard.writeText(summaryText()); status("Summary copied. Paste it into Claude."); }
+  catch { $("paste").value = summaryText(); $("help").classList.remove("hidden"); status("Clipboard blocked. The summary is in the text box below, so select and copy it from there.", true); }
+};
+$("f").addEventListener("submit", load);
+$("usePaste").onclick = () => usePaste().catch(err => status(err.message, true));
+load();
+</script>
+</body>
+</html>
