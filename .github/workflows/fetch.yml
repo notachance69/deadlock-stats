@@ -8,16 +8,20 @@ on:
       kind:
         description: "What to fetch"
         type: choice
-        options: [history, match, leaderboard]
-        default: history
+        options: [top-players, history, match, leaderboard, hero-stats]
+        default: top-players
       id:
-        description: "history: account ID or tracklock URL · match: match ID(s), comma-separated · leaderboard: region (NAmerica, Europe, Asia, SAmerica, Oceania)"
+        description: "history: account ID or tracklock URL · match: match ID(s), comma-separated · top-players/leaderboard: region (NAmerica, Europe, Asia, SAmerica, Oceania) · hero-stats: min average badge (e.g. 100)"
         required: true
-        default: "122627581"
+        default: "NAmerica"
       hero:
-        description: "leaderboard only: hero name or ID (e.g. Haze)"
+        description: "top-players/leaderboard: hero name or ID (e.g. Haze), or 'any' for the overall leaderboard"
         required: false
-        default: "Haze"
+        default: "any"
+      count:
+        description: "top-players: how many players to fetch"
+        required: false
+        default: "30"
       recent_timelines:
         description: "history only: also fetch per-match timelines for the N most recent ranked matches (0 = none)"
         required: false
@@ -33,7 +37,7 @@ concurrency:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -47,10 +51,17 @@ jobs:
           ID: ${{ inputs.id }}
           HERO: ${{ inputs.hero }}
           RECENT: ${{ inputs.recent_timelines }}
+          COUNT: ${{ inputs.count }}
         run: |
           set -euo pipefail
-          mkdir -p data/history data/matches data/leaderboards
+          mkdir -p data/history data/matches data/leaderboards data/top data/analytics
           case "$KIND" in
+            top-players)
+              python3 deadlock_tool.py top "$ID" --hero "$HERO" -n "$COUNT" --outdir data/top
+              ;;
+            hero-stats)
+              python3 deadlock_tool.py fetch hero-stats "$ID" -o "data/analytics/hero_stats_badge$ID.json"
+              ;;
             history)
               ACCT=$(python3 -c "import sys; sys.path.insert(0,'.'); import deadlock_tool as t; print(t.acct(sys.argv[1]))" "$ID")
               python3 deadlock_tool.py fetch history "$ACCT" -o "data/history/$ACCT.json"
@@ -68,8 +79,12 @@ jobs:
               done
               ;;
             leaderboard)
-              HID=$(python3 -c "import sys; sys.path.insert(0,'.'); import deadlock_tool as t; print(t.hero_id(sys.argv[1]))" "$HERO")
-              python3 deadlock_tool.py fetch leaderboard "$ID" "$HID" -o "data/leaderboards/${ID}_${HID}.json"
+              if [ "${HERO,,}" = "any" ]; then
+                python3 deadlock_tool.py fetch leaderboard "$ID" -o "data/leaderboards/${ID}_all.json"
+              else
+                HID=$(python3 -c "import sys; sys.path.insert(0,'.'); import deadlock_tool as t; print(t.hero_id(sys.argv[1]))" "$HERO")
+                python3 deadlock_tool.py fetch leaderboard "$ID" "$HID" -o "data/leaderboards/${ID}_${HID}.json"
+              fi
               ;;
           esac
 

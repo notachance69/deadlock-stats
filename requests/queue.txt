@@ -1,0 +1,3 @@
+top NAmerica -n 30 --outdir data/top
+fetch history 122627581 -o data/history/122627581.json
+fetch hero-stats 100 -o data/analytics/hero_stats_badge100.json

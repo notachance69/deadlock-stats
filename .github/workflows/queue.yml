@@ -1,0 +1,36 @@
+name: Run fetch queue
+
+# Runs automatically when requests/queue.txt is pushed (lets Claude request data by committing
+# a line to the queue). Results are committed into data/; the log is data/_last_run.txt.
+on:
+  push:
+    branches: [main]
+    paths: ["requests/queue.txt"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-data
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run queued requests
+        run: python3 run_queue.py
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data requests/queue.txt
+          if git diff --cached --quiet; then echo "Nothing to commit"; exit 0; fi
+          git commit -m "data: queued fetch results"
+          for i in 1 2 3; do git pull --rebase -q && git push && break; sleep 5; done

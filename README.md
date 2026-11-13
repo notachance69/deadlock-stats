@@ -22,6 +22,17 @@ Enter an account ID (the number in a tracklock.gg URL) or paste a whole trackloc
 | `match` | match ID(s), comma-separated | `data/matches/<match>.json` |
 | `leaderboard` | region (`NAmerica`, `Europe`, …) + `hero` | `data/leaderboards/<region>_<hero>.json` |
 
+## 2b. Request queue (lets Claude fetch data)
+
+Pushing a change to `requests/queue.txt` runs the **Run fetch queue** workflow automatically. Each line is one `deadlock_tool.py` command; only `fetch` and `top` are allowed, and output must stay inside `data/`. When the run finishes, the queue is cleared and the log is saved to `data/_last_run.txt`.
+
+```
+top NAmerica -n 30                    # top 30 NA leaderboard players → data/top/<id>.json
+fetch history 122627581 -o data/history/122627581.json
+fetch match 131993110 -o data/matches/131993110.json
+fetch hero-stats 100 -o data/analytics/hero_stats_badge100.json
+```
+
 ## 3. Analysis script
 
 `deadlock_tool.py` uses only the Python standard library:
@@ -31,6 +42,7 @@ python3 deadlock_tool.py player data/history/122627581.json --hero Haze --ranked
 python3 deadlock_tool.py compare data/history/122627581.json data/history/278919272.json --names Me,Pro --hero Haze --ranked
 python3 deadlock_tool.py ids data/history/122627581.json --ranked -n 5
 python3 deadlock_tool.py match data/matches/131993110.json --account 122627581
+python3 deadlock_tool.py pool "data/top/*.json" --me data/history/122627581.json --since 2026-01-01   # top players' heroes + who plays like you
 python3 deadlock_tool.py fetch history 122627581 -o me.json   # if your network can reach the API
 ```
 

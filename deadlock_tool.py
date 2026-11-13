@@ -63,12 +63,78 @@ def cmd_links(a):
 def cmd_fetch(a):
     url = {"history": lambda: f"{API}/v1/players/{acct(a.args[0])}/match-history",
            "match": lambda: f"{API}/v1/matches/{a.args[0]}/metadata",
-           "leaderboard": lambda: f"{API}/v1/leaderboard/{a.args[0]}/{hero_id(a.args[1])}"}[a.kind]()
+           "leaderboard": lambda: f"{API}/v1/leaderboard/{a.args[0]}" + (f"/{hero_id(a.args[1])}" if len(a.args) > 1 else ""),
+           "hero-stats": lambda: f"{API}/v1/analytics/hero-stats?min_average_badge={a.args[0]}"}[a.kind]()
     try:
         data = get(url)
     except Exception as e:
         sys.exit(f"Could not reach the API ({e}).\nOpen this URL in a browser, save/copy the page, and provide the file instead:\n{url}")
     json.dump(data, open(a.output, "w")); print(f"Saved {a.output} from {url}")
+
+def cmd_top(a):
+    """Leaderboard -> match histories of the top N players with an unambiguous account ID."""
+    import os, time
+    hero = hero_id(a.hero) if a.hero and a.hero.lower() != "any" else None
+    url = f"{API}/v1/leaderboard/{a.region}" + (f"/{hero}" if hero else "")
+    entries = get(url).get("entries", [])
+    os.makedirs(a.outdir, exist_ok=True)
+    picked, skipped = [], 0
+    for pos, e in enumerate(entries, 1):
+        ids = e.get("possible_account_ids") or []
+        if len(ids) != 1: skipped += 1; continue
+        picked.append({"position": pos, "name": e.get("account_name"), "rank": e.get("rank"),
+                       "account_id": ids[0], "top_heroes": [hero_name(h) for h in e.get("top_hero_ids") or []]})
+        if len(picked) >= a.n: break
+    for p in picked:
+        path = f"{a.outdir}/{p['account_id']}.json"
+        try:
+            json.dump(get(f"{API}/v1/players/{p['account_id']}/match-history"), open(path, "w"))
+            p["file"] = path; print(f"#{p['position']:>3} {p['name']} ({p['account_id']}) → {path}")
+        except Exception as ex:
+            p["error"] = str(ex); print(f"#{p['position']:>3} {p['name']}: failed ({ex})")
+        time.sleep(a.delay)
+    idx = f"{a.outdir}/_index_{a.region}_{hero or 'all'}.json"
+    json.dump({"source": url, "fetched": dt.datetime.now(dt.timezone.utc).isoformat(), "skipped_ambiguous": skipped,
+               "players": picked}, open(idx, "w"), indent=1)
+    print(f"Saved {len(picked)} players (skipped {skipped} with ambiguous IDs). Index: {idx}")
+
+def cmd_pool(a):
+    """Aggregate many histories: what heroes do these players play and win on, and who plays most like YOU."""
+    import glob, math
+    files = [f for pat in a.files for f in glob.glob(pat) if not f.split("/")[-1].startswith("_")]
+    me = load_history(a.me, a) if a.me else None
+    def shares(g):
+        c = Counter(x["hero"] for x in g); n = sum(c.values()) or 1
+        return {h: v / n for h, v in c.items()}
+    def cos(p, q):
+        dot = sum(p[h] * q.get(h, 0) for h in p)
+        return dot / (math.sqrt(sum(v*v for v in p.values())) * math.sqrt(sum(v*v for v in q.values())) or 1)
+    players, allg = [], []
+    for f in files:
+        g = load_history(f, a)
+        if len(g) < a.min_games: continue
+        players.append((f, g)); allg += g
+    print(f"{len(players)} players, {len(allg)} games after filters\n")
+    per = defaultdict(list)
+    for f, g in players:
+        for h in set(x["hero"] for x in g): per[h].append(f)
+    print(f"{'hero':<14}{'players':>8}{'games':>7}{'WR':>6}{'K/D/A':>15}{'A/K':>6}{'D/10m':>7}{'LH/10m':>8}{'spm':>6}")
+    rows = sorted(Counter(x["hero"] for x in allg).items(), key=lambda kv: -kv[1])
+    for h, n in rows[:a.top]:
+        s = S([x for x in allg if x["hero"] == h])
+        print(f"{h:<14}{len(per[h]):>8}{n:>7}{pct(s['wr']):>6}{s['k']:>5.1f}/{s['d']:.1f}/{s['a']:<5.1f}{s['ak']:>6.2f}{s['d10']:>7.2f}{s['lh10']:>8.0f}{s['spm']:>6.0f}")
+    if me:
+        mine = shares(me)
+        sims = sorted(((cos(mine, shares(g)), f, g) for f, g in players), key=lambda t: -t[0])
+        print(f"\nPlayers whose hero pool is most like yours (cosine similarity of hero play share):")
+        for sim, f, g in sims[:a.similar]:
+            s = S(g); top = ", ".join(f"{h} {c}" for h, c in Counter(x['hero'] for x in g).most_common(5))
+            print(f"  {sim:.2f}  {f.split('/')[-1][:-5]:>11}  {s['n']:>4} games {pct(s['wr'])}  D/10m {s['d10']:.2f}  A/K {s['ak']:.2f}  | {top}")
+        sim_g = [x for _, _, g in sims[:a.similar] for x in g]
+        print("\nWhat those similar players play (combined):")
+        for h, n in Counter(x["hero"] for x in sim_g).most_common(a.top // 2):
+            s = S([x for x in sim_g if x["hero"] == h]); ms = S([x for x in me if x["hero"] == h])
+            print(f"  {h:<14} {n:>4} games {pct(s['wr']):>4}  D/10m {s['d10']:.2f}   | you: " + (f"{ms['rec']} {pct(ms['wr'])} D/10m {ms['d10']:.2f}" if ms else "never played"))
 
 # ---------------- match history ----------------
 def load_history(path, a):
@@ -246,13 +312,20 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sp = ap.add_subparsers(dest="cmd", required=True)
     p = sp.add_parser("links"); p.add_argument("account"); p.add_argument("--matches", nargs="*"); p.set_defaults(fn=cmd_links)
-    p = sp.add_parser("fetch"); p.add_argument("kind", choices=["history", "match", "leaderboard"]); p.add_argument("args", nargs="+")
+    p = sp.add_parser("fetch"); p.add_argument("kind", choices=["history", "match", "leaderboard", "hero-stats"]); p.add_argument("args", nargs="+")
     p.add_argument("-o", "--output", required=True); p.set_defaults(fn=cmd_fetch)
+    p = sp.add_parser("top", help="fetch histories of the top N leaderboard players")
+    p.add_argument("region", choices=["NAmerica", "Europe", "Asia", "SAmerica", "Oceania"]); p.add_argument("--hero", default="any")
+    p.add_argument("-n", type=int, default=25); p.add_argument("--outdir", default="data/top"); p.add_argument("--delay", type=float, default=1.5)
+    p.set_defaults(fn=cmd_top)
     def filt(p):
         p.add_argument("--since"); p.add_argument("--hero"); p.add_argument("--all-modes", action="store_true")
         m = p.add_mutually_exclusive_group(); m.add_argument("--ranked", action="store_true"); m.add_argument("--unranked", action="store_true")
     p = sp.add_parser("player"); p.add_argument("files", nargs=1); p.add_argument("--top", type=int, default=12); filt(p); p.set_defaults(fn=cmd_player)
     p = sp.add_parser("compare"); p.add_argument("files", nargs="+"); p.add_argument("--names"); filt(p); p.set_defaults(fn=cmd_compare)
+    p = sp.add_parser("pool", help="aggregate many players' histories (glob ok), optionally vs --me")
+    p.add_argument("files", nargs="+"); p.add_argument("--me"); p.add_argument("--min-games", type=int, default=30)
+    p.add_argument("--top", type=int, default=25); p.add_argument("--similar", type=int, default=5); filt(p); p.set_defaults(fn=cmd_pool)
     p = sp.add_parser("ids"); p.add_argument("files", nargs=1); p.add_argument("-n", type=int, default=10); filt(p); p.set_defaults(fn=cmd_ids)
     p = sp.add_parser("match"); p.add_argument("file"); p.add_argument("--account", required=True)
     p.add_argument("--items", help="optional items asset JSON (from /v1/assets/items) for item names"); p.set_defaults(fn=cmd_match)
