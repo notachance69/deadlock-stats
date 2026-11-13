@@ -32,7 +32,7 @@ HEROES = {1: "Infernus", 2: "Seven", 3: "Vindicta", 4: "Lady Geist", 6: "Abrams"
   58: "Vyper", 59: "Vandal", 60: "Sinclair", 61: "Trapper", 62: "Raven", 63: "Mina", 64: "Drifter",
   65: "Venator", 66: "Victor", 67: "Paige", 69: "The Doorman", 72: "Billy", 73: "Druid", 74: "Graf",
   75: "Fortuna", 76: "Graves", 77: "Apollo", 78: "Airheart", 79: "Rem", 80: "Silver", 81: "Celeste",
-  82: "Opera"}
+  82: "Opera", 84: "Rat King", 85: "Solomon", 88: "Baba"}
 MODES = {1: "Unranked", 2: "Private", 3: "Bots", 4: "Ranked"}
 STEAM64 = 76561197960265728
 
